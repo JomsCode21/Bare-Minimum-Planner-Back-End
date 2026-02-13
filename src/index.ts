@@ -1,15 +1,20 @@
-import dotenv from "dotenv";
-dotenv.config();
 import expressMongoSanitize from "@exortek/express-mongo-sanitize";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import dotenv from "dotenv";
 import express from "express";
 import helmet from "helmet";
 import http from "http";
 import morgan from "morgan";
-import initDB from "@/db/db.connect.js";
+import "./db";
 import { globalErrorHandler } from "./middlewares/global-error-handler.middleware";
 import { globalRateLimiter } from "./middlewares/limiter.middleware";
+dotenv.config();
+
+// Importing New Routes
+import taskRoutes from "./routes/taskRoutes";
+import userRoutes from "./routes/userRoutes";
+
 const bootstrap = async () => {
   const app = express();
   app.set("trust proxy", 1);
@@ -51,12 +56,14 @@ const bootstrap = async () => {
   });
   // Routes
   // app.use("api", route);
+  app.use("/api/users", userRoutes);
+  app.use("/api/tasks", taskRoutes);
   // Error handler
+
   app.use(globalErrorHandler);
   const server = http.createServer(app);
   server.setTimeout(300000);
   server.listen(PORT, () => {
-    initDB();
     console.log(`Server Running on port ${PORT}`);
   });
 };
