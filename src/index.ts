@@ -1,72 +1,75 @@
-import expressMongoSanitize from "@exortek/express-mongo-sanitize";
-import cookieParser from "cookie-parser";
-import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
 import helmet from "helmet";
 import http from "http";
 import morgan from "morgan";
-import "./db";
+// import expressMongoSanitize from "express-mongo-sanitize";
+
+// Database Connection
+import "./db"; 
+
+// Custom Middlewares
 import { globalErrorHandler } from "./middlewares/global-error-handler.middleware";
 import { globalRateLimiter } from "./middlewares/limiter.middleware";
-dotenv.config();
 
-// Importing New Routes
+// Route Imports
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
+import registerRoutes from "./routes/registerRoutes";
+
+dotenv.config();
 
 const bootstrap = async () => {
   const app = express();
-  app.set("trust proxy", 1);
-
   const PORT = process.env.PORT || 5000;
-  const allowedOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(",")
-    : [];
-  // CORS
+
+  // --- Security & Configuration ---
+  app.set("trust proxy", 1);
+  app.use(helmet());
+
+  // --- CORS Configuration ---
+  // This tells the browser: "Allow http://localhost:5173 to send cookies to us"
   app.use(
     cors({
-      origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-        // Reject everything else
-        callback(new Error("CORS not allowed"), false);
-      },
-      credentials: true,
-    }),
+      origin: "http://localhost:5173", // Must match your frontend URL exactly
+      credentials: true,               // Critical for cookies to work
+    })
   );
-  // Security headers
-  app.use(helmet());
-  // Rate limiting
-  app.use(globalRateLimiter);
-  // Logger
-  app.use(morgan("dev"));
-  // JSON parser
-  app.use(express.json());
-  // Prevent NoSQL Injection
-  app.use(expressMongoSanitize());
 
-  // Cookie parser
-  app.use(cookieParser());
-  // Root
+  // --- Parsers (Read incoming data) ---
+  app.use(express.json());   // Reads JSON body
+  app.use(cookieParser());   // Reads Cookies
+
+  // --- Logging & Sanitization ---
+  app.use(morgan("dev"));             // Log requests to console
+  // app.use(expressMongoSanitize());    // Prevent NoSQL injection
+  app.use(globalRateLimiter);         // Limit repeated requests
+
+  // --- Test Route ---
   app.get("/api/test", (req, res) => {
     res.status(200).send("Welcome to hell boss");
   });
-  // Routes
-  // app.use("api", route);
+
+  // --- API Routes ---
   app.use("/api/users", userRoutes);
   app.use("/api/tasks", taskRoutes);
-  // Error handler
+  app.use("/api/register", registerRoutes);
 
+  // --- Error Handling ---
+  // (Must be the last middleware used)
   app.use(globalErrorHandler);
+
+  // --- Start Server ---
   const server = http.createServer(app);
   server.setTimeout(300000);
+  
   server.listen(PORT, () => {
     console.log(`Server Running on port ${PORT}`);
   });
 };
+
 bootstrap().catch((e) => {
   console.error("Fatal boot error:", e);
   process.exit(1);

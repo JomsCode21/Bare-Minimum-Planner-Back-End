@@ -32,7 +32,7 @@ export const deleteTask = async (req: Request, res: Response) => {
 export const updateTask = async (req: Request, res: Response) => {
     try {
         const {id} = req.params;
-        const { title, description} = req.body;
+        const { title, description, isCompleted} = req.body;
 
         // Finding task using id
         const task = await TaskModel.findById(id);
@@ -42,6 +42,10 @@ export const updateTask = async (req: Request, res: Response) => {
 
         if (title) task.title = title;
         if (description) task.description = description;
+
+        if (isCompleted !== undefined) {
+            task.isCompleted = isCompleted;
+        }
         
         // saving updated Task
         const updatedTask = await task.save();

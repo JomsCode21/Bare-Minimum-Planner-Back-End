@@ -1,6 +1,20 @@
 import { Request, Response} from "express";
 import { UserModel } from "@/models/user.model";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+
+const generateToken = (res: Response, userId: any) => {
+    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET || "secret_key", {
+        expiresIn: "30d",
+    });
+
+    res.cookie('jwt', token, {
+        httpOnly: true,
+        secure: false, // Set to 'false' for localhost (HTTP), 'true' for production (HTTPS)
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+};
 
 export const registerUser = async (req: Request, res: Response) => {
     try{
@@ -27,6 +41,7 @@ export const registerUser = async (req: Request, res: Response) => {
 };
 
 export const loginUser = async (req: Request, res: Response) => {
+    const jwt = require('jsonwebtoken');
     try {
         const { email, password } = req.body;
         const user: any = await UserModel.findOne({ email });
@@ -39,6 +54,7 @@ export const loginUser = async (req: Request, res: Response) => {
             return res.status(400).json( { message: "Invalid credentials"});
         }
 
+        generateToken(res, user._id);
         res.status(200).json({
             message: "Login sucessful",
             user: { id: user._id, name: user.name, email: user.email }
@@ -59,6 +75,20 @@ export const getAllUser = async (req:Request, res: Response) => {
         res.status(500).json({message: error});
     }
 }
+
+// export const getOneUser = async (req: Request, res:Response) => {
+//     try {
+//         const { id } = req.params;
+
+//         const user = await UserModel.findById(id);
+//         if (!user) {
+//             return res.status(404).json({message: "User not found."});
+//         }
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).json({message: "Error finding user"});
+//     }
+// }
 
 
 export const updateUser = async (req: Request, res: Response) => {
