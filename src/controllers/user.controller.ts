@@ -2,9 +2,17 @@ import { Request, Response} from "express";
 import { UserModel } from "@/models/user.model";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { ForgotPassword } from "@/utils/ForgotPassword";
+
 
 const generateToken = (res: Response, userId: any) => {
-    const token = jwt.sign({ id: userId }, process.env.JWT_SECRET || "secret_key", {
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret) {
+        throw new Error("FATAL ERROR: JWT_SECRET is not defined.");
+    }
+
+    const token = jwt.sign({ id: userId }, secret , {
         expiresIn: "30d",
     });
 
@@ -76,19 +84,29 @@ export const getAllUser = async (req:Request, res: Response) => {
     }
 }
 
-// export const getOneUser = async (req: Request, res:Response) => {
-//     try {
-//         const { id } = req.params;
+export const findUser = async (req: Request, res:Response) => {
+    try {
+        const { email } = req.body;
 
-//         const user = await UserModel.findById(id);
-//         if (!user) {
-//             return res.status(404).json({message: "User not found."});
-//         }
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({message: "Error finding user"});
-//     }
-// }
+        const user = await UserModel.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found registered in this email."});
+        }
+
+        const resetLink = `http://localhost:5173/resetpassword?id=${user._id}`;
+
+        await ForgotPassword(user.email, resetLink);
+
+        return res.status(200).json({
+            message: "User found",
+            userId: user._id
+        })
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({message: "Server Error"});
+    }
+}
 
 
 export const updateUser = async (req: Request, res: Response) => {
@@ -114,7 +132,7 @@ export const updateUser = async (req: Request, res: Response) => {
         // Updating name
         if (name) user.name = name;
 
-        //Updating password (rehash using bcrypt)
+        //Updating password 
         if(password) {
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
@@ -138,3 +156,13 @@ export const updateUser = async (req: Request, res: Response) => {
         res.status(500).json({message: "Error updating user info"});
     }
 };
+
+export const logoutUser = (req: Request, res: Response) => {
+    res.clearCookie("jwt", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+    });
+
+    return res.status(200).json({message: "Logged out successfully. "});
+}
