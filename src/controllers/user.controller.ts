@@ -3,6 +3,7 @@ import { UserModel } from "@/models/user.model";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { ForgotPassword } from "@/utils/ForgotPassword";
+import { AuthRequest } from "@/middlewares/verify-token.middleware";
 
 
 const generateToken = (res: Response, userId: any) => {
@@ -20,8 +21,21 @@ const generateToken = (res: Response, userId: any) => {
         httpOnly: true,
         secure: false, // Set to 'false' for localhost (HTTP), 'true' for production (HTTPS)
         sameSite: 'lax',
+        path: "/",
         maxAge: 30 * 24 * 60 * 60 * 1000,
     });
+};
+
+export const checkEmail = async (req: Request, res: Response) => {
+    try {
+        // Checking if the user already exist
+        const { email } = req.body;
+        const userExist = await UserModel.findOne({email });
+
+        return res.status(200).json({ exists: !!userExist });
+    } catch (error) {
+        res.status(500).json({ message: "Server Error" });
+    }
 };
 
 export const registerUser = async (req: Request, res: Response) => {
@@ -49,7 +63,7 @@ export const registerUser = async (req: Request, res: Response) => {
 };
 
 export const loginUser = async (req: Request, res: Response) => {
-    const jwt = require('jsonwebtoken');
+   
     try {
         const { email, password } = req.body;
         const user: any = await UserModel.findOne({ email });
@@ -166,3 +180,11 @@ export const logoutUser = (req: Request, res: Response) => {
 
     return res.status(200).json({message: "Logged out successfully. "});
 }
+
+export const checkAuth = (req: AuthRequest, res: Response) => {
+    
+    return res.status(200).json({
+        isAuthenticated: true,
+        user: req.user
+    });
+};

@@ -17,7 +17,6 @@ import { globalRateLimiter } from "./middlewares/limiter.middleware";
 // Route Imports
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
-import registerRoutes from "./routes/registerRoutes";
 
 dotenv.config();
 
@@ -55,7 +54,6 @@ const bootstrap = async () => {
   // --- API Routes ---
   app.use("/api/users", userRoutes);
   app.use("/api/tasks", taskRoutes);
-  app.use("/api/register", registerRoutes);
 
   // --- Error Handling ---
   // (Must be the last middleware used)
