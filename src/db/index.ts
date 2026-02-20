@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import dns from "dns";
+
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 /**
  * Database Connection Manager
@@ -6,7 +9,7 @@ import mongoose from "mongoose";
  * This file handles our connection to MongoDB. We use Mongoose to manage
  * our data models and make it easier to interact with the database.
  */
-const dbURI = process.env.MONGO_DB_URI || "mongodb://localhost:27017/auth-project";
+const dbURI = process.env.MONGO_DB_URI || "mongodb://localhost:27017/todolist";
 
 mongoose
   .connect(dbURI)
