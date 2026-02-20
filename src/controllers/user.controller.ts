@@ -4,8 +4,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { ForgotPassword } from "@/utils/ForgotPassword";
 import { AuthRequest } from "@/middlewares/verify-token.middleware";
+import axios from "axios";
 
-
+// Helper function to generate JWT token and set it as a cookie
 const generateToken = (res: Response, userId: any) => {
     const secret = process.env.JWT_SECRET;
 
@@ -26,6 +27,52 @@ const generateToken = (res: Response, userId: any) => {
     });
 };
 
+// Google Login
+export const googleLogin = async (req: Request, res: Response) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: "Google Token is required" });
+        }
+
+        // Send the token to Google for verification
+        const googleResponse = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const { email, name } = googleResponse.data;
+
+        // Check if the user already exists in the database
+        let user: any = await UserModel.findOne({ email });
+
+        if (!user) {
+            user = await UserModel.create({
+                name: name,
+                email: email,
+                password: Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10), // Generate a random password for Google users
+            });
+        }
+
+        // Use your helper function to generate the exact same cookie! 
+        generateToken(res, user._id);
+
+        // Send response back to the client matching loginUser structure
+        res.status(200).json({
+            message: "Google login successful",
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+            }
+        });
+    } catch (error: any) {
+        console.error("Google login error:", error.response?.data || error.message || error);
+        res.status(500).json({ message: "Error during Google login", error: error.response?.data || error.message || error });
+    }
+};
+
+// Check if email is already registered
 export const checkEmail = async (req: Request, res: Response) => {
     try {
         // Checking if the user already exist
@@ -38,6 +85,7 @@ export const checkEmail = async (req: Request, res: Response) => {
     }
 };
 
+// User Registration
 export const registerUser = async (req: Request, res: Response) => {
     try{
         const { name, email, password } = req.body;
@@ -62,6 +110,7 @@ export const registerUser = async (req: Request, res: Response) => {
     }
 };
 
+// User Login
 export const loginUser = async (req: Request, res: Response) => {
    
     try {
@@ -86,6 +135,7 @@ export const loginUser = async (req: Request, res: Response) => {
     }
 };
 
+// Get all users (for testing purposes)
 export const getAllUser = async (req:Request, res: Response) => {
     try {
         const user = await UserModel.find();
@@ -98,6 +148,7 @@ export const getAllUser = async (req:Request, res: Response) => {
     }
 }
 
+// Forgot Password
 export const findUser = async (req: Request, res:Response) => {
     try {
         const { email } = req.body;
@@ -122,7 +173,7 @@ export const findUser = async (req: Request, res:Response) => {
     }
 }
 
-
+// Update User Info
 export const updateUser = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -171,6 +222,7 @@ export const updateUser = async (req: Request, res: Response) => {
     }
 };
 
+// User Logout
 export const logoutUser = (req: Request, res: Response) => {
     res.clearCookie("jwt", {
         httpOnly: true,
@@ -181,6 +233,7 @@ export const logoutUser = (req: Request, res: Response) => {
     return res.status(200).json({message: "Logged out successfully. "});
 }
 
+// Check Authentication
 export const checkAuth = (req: AuthRequest, res: Response) => {
     
     return res.status(200).json({
