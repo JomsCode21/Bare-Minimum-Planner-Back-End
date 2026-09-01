@@ -4,6 +4,8 @@ export interface ITask extends Document {
   title: string;
   description: string,
   isCompleted: boolean;
+  dueAt?: Date;
+  pushReminderSentAt?: Date | null;
   createdAt: Date;
   user: mongoose.Types.ObjectId; // Reference to the User model
 }
@@ -13,6 +15,8 @@ const TaskSchema: Schema = new Schema(
     title: { type: String},
     description: {type: String},
     isCompleted: { type: Boolean, default: false },
+    dueAt: { type: Date },
+    pushReminderSentAt: { type: Date, default: null },
 
     user: {
     type: mongoose.Schema.Types.ObjectId,

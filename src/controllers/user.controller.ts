@@ -2,6 +2,7 @@ import { Request, Response} from "express";
 import { UserModel } from "@/models/user.model";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { ForgotPassword } from "@/utils/ForgotPassword";
 import { AuthRequest } from "@/middlewares/verify-token.middleware";
 import axios from "axios";
@@ -153,25 +154,118 @@ export const findUser = async (req: Request, res:Response) => {
     try {
         const { email } = req.body;
 
+        if (!email) {
+            return res.status(400).json({ message: "Email is required." });
+        }
+
         const user = await UserModel.findOne({ email });
 
         if (!user) {
-            return res.status(404).json({ message: "User not found registered in this email."});
+            return res.status(200).json({
+                message: "If an account exists for this email, a reset link has been sent.",
+            });
         }
 
-        const resetLink = `http://localhost:5173/resetpassword?id=${user._id}`;
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        user.passwordResetToken = crypto
+            .createHash("sha256")
+            .update(resetToken)
+            .digest("hex");
+        user.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        await user.save();
+
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        const resetLink = `${frontendUrl}/resetpassword?token=${resetToken}`;
 
         await ForgotPassword(user.email, resetLink);
 
         return res.status(200).json({
-            message: "User found",
-            userId: user._id
-        })
+            message: "If an account exists for this email, a reset link has been sent.",
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({message: "Server Error"});
     }
 }
+
+// Reset Password (uses a short-lived, single-use token sent by email)
+export const resetPassword = async (req: Request, res: Response) => {
+    try {
+        const token = Array.isArray(req.params.token)
+            ? req.params.token[0]
+            : req.params.token;
+        const { password } = req.body;
+
+        if (!token || !password || typeof password !== "string" || password.length < 8) {
+            return res.status(400).json({
+                message: "The reset link or password is invalid.",
+            });
+        }
+
+        const hashedToken = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+
+        const user = await UserModel.findOne({
+            passwordResetToken: hashedToken,
+            passwordResetExpiresAt: { $gt: new Date() },
+        }).select("+passwordResetToken +passwordResetExpiresAt");
+
+        if (!user) {
+            return res.status(400).json({
+                message: "This password reset link is invalid or has expired.",
+            });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+        user.passwordResetToken = undefined;
+        user.passwordResetExpiresAt = undefined;
+        await user.save();
+
+        return res.status(200).json({ message: "Password reset successful." });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Error resetting password." });
+    }
+};
+
+// Save or refresh the current browser/device push subscription.
+export const savePushSubscription = async (req: AuthRequest, res: Response) => {
+    try {
+        const { endpoint, expirationTime, keys } = req.body;
+
+        if (
+            !endpoint ||
+            typeof endpoint !== "string" ||
+            !keys?.p256dh ||
+            !keys?.auth
+        ) {
+            return res.status(400).json({ message: "Invalid push subscription." });
+        }
+
+        const user = await UserModel.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        user.pushSubscriptions = user.pushSubscriptions.filter(
+            (subscription) => subscription.endpoint !== endpoint,
+        );
+        user.pushSubscriptions.push({
+            endpoint,
+            expirationTime: typeof expirationTime === "number" ? expirationTime : null,
+            keys: { p256dh: keys.p256dh, auth: keys.auth },
+        });
+        await user.save();
+
+        return res.status(201).json({ message: "Push notifications enabled." });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Could not save push subscription." });
+    }
+};
 
 // Update User Info
 export const updateUser = async (req: Request, res: Response) => {
