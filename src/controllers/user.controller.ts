@@ -10,6 +10,7 @@ import axios from "axios";
 // Helper function to generate JWT token and set it as a cookie
 const generateToken = (res: Response, userId: any) => {
     const secret = process.env.JWT_SECRET;
+    const isProduction = process.env.NODE_ENV === "production";
 
     if (!secret) {
         throw new Error("FATAL ERROR: JWT_SECRET is not defined.");
@@ -21,8 +22,8 @@ const generateToken = (res: Response, userId: any) => {
 
     res.cookie('jwt', token, {
         httpOnly: true,
-        secure: false, // Set to 'false' for localhost (HTTP), 'true' for production (HTTPS)
-        sameSite: 'lax',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         path: "/",
         maxAge: 30 * 24 * 60 * 60 * 1000,
     });
