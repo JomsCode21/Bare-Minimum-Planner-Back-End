@@ -17,6 +17,7 @@ import { globalRateLimiter } from "./middlewares/limiter.middleware";
 // Route Imports
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
+import { startPushReminderScheduler } from "./utils/push-notifications";
 
 dotenv.config();
 
@@ -32,7 +33,7 @@ const bootstrap = async () => {
   // This tells the browser: "Allow http://localhost:5173 to send cookies to us"
   app.use(
     cors({
-      origin: "http://localhost:5173", // Must match your frontend URL exactly
+      origin: process.env.CORS_ORIGINS?.split(",").map((origin) => origin.trim()) || "http://localhost:5173",
       credentials: true,               // Critical for cookies to work
     })
   );
@@ -65,6 +66,7 @@ const bootstrap = async () => {
   
   server.listen(PORT, () => {
     console.log(`Server Running on port ${PORT}`);
+    startPushReminderScheduler();
   });
 };
 

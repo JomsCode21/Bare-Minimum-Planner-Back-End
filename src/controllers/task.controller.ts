@@ -15,8 +15,19 @@ export const getTask = async(req: AuthRequest, res: Response) => {
 // Create a new task for the authenticated user
 export const createTask = async(req: AuthRequest, res: Response) => {
     try {
-        const { title, description } = req.body;
-        const newTask = await TaskModel.create({title, description, user: req.user._id});
+        const { title, description, dueAt } = req.body;
+        const parsedDueAt = dueAt ? new Date(dueAt) : undefined;
+
+        if (dueAt && Number.isNaN(parsedDueAt?.getTime())) {
+            return res.status(400).json({ message: "Invalid due date." });
+        }
+
+        const newTask = await TaskModel.create({
+            title,
+            description,
+            dueAt: parsedDueAt,
+            user: req.user._id,
+        });
         res.status(201).json(newTask);
     } catch (error) {
         res.status(500).json({message: "Error creating task"});
@@ -41,13 +52,21 @@ export const deleteTask = async (req: AuthRequest, res: Response) => {
 export const updateTask = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const { title, description, isCompleted } = req.body;
+        const { title, description, isCompleted, dueAt } = req.body;
 
         // Build the update object
         const updateFields: any = {};
-        if (title) updateFields.title = title;
-        if (description) updateFields.description = description;
+        if (title !== undefined) updateFields.title = title;
+        if (description !== undefined) updateFields.description = description;
         if (isCompleted !== undefined) updateFields.isCompleted = isCompleted;
+        if (dueAt !== undefined) {
+            const parsedDueAt = dueAt ? new Date(dueAt) : null;
+            if (dueAt && Number.isNaN(parsedDueAt?.getTime())) {
+                return res.status(400).json({ message: "Invalid due date." });
+            }
+            updateFields.dueAt = parsedDueAt;
+            updateFields.pushReminderSentAt = null;
+        }
 
         // findOneAndUpdate safely updates ONLY if both the Task ID and User ID match
         const updatedTask = await TaskModel.findOneAndUpdate(
@@ -67,7 +86,8 @@ export const updateTask = async (req: AuthRequest, res: Response) => {
                 id: updatedTask._id,
                 title: updatedTask.title,
                 description: updatedTask.description,
-                isCompleted: updatedTask.isCompleted // Added this back into your response!
+                isCompleted: updatedTask.isCompleted,
+                dueAt: updatedTask.dueAt,
             }
         });
 
